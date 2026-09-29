@@ -60,7 +60,7 @@ export class MemberService {
 
     public async updateMember(memberId: ObjectId, input: MemberUpdate): Promise<Member> {
         const result: Member | null = await this.memberModel
-            .findByIdAndUpdate(
+            .findOneAndUpdate(
                 {
                     _id: memberId, // filter
                     memberStatus: MemberStatus.ACTIVE,

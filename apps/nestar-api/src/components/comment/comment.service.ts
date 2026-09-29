@@ -31,40 +31,15 @@ export class CommentService {
             console.log('Error, Servise.model:', err.message);
             throw new BadRequestException(Message.CREATE_FAILED);
         }
-        // switch-case — bitta qiymatni variantlar bilan solishtirib,
-        //  mos kelganini bajaradi. if / else if ning qisqasi.
-        // shart yoq shu uchun switch case
-        switch (input.commentGroup) {
-            case CommentGroup.PROPERTY:
-                await this.propertyService.propertyStatsEditor({
-                    _id: input.commentRefId,
-                    targetKey: 'propertyComments',
-                    modifier: 1,
-                });
-                break; // mos case bajarilgach switch'dan chiqib ketadi
+        // izoh qaysi turga yozilgan bo'lsa, o'shaning hisoblagichi +1
+        await this.commentStatsEditor(input.commentGroup, input.commentRefId, 1);
 
-            case CommentGroup.ARTICLE:
-                await this.boardArticleService.boardArticleStatsEditor({
-                    _id: input.commentRefId,
-                    targetKey: 'articleComments',
-                    modifier: 1,
-                });
-                break;
-
-            case CommentGroup.MEMBER:
-                await this.memberService.memberStatsEditor({
-                    _id: input.commentRefId,
-                    targetKey: 'memberComments',
-                    modifier: 1,
-                });
-                break;
-        }
         if (!result) throw new InternalServerErrorException(Message.CREATE_FAILED);
         return result;
     }
 
     public async updateComment(memberId: ObjectId, input: CommentUpdate): Promise<Comment> {
-        const { _id } = input;
+        const { _id, commentStatus } = input;
         const result = await this.commentModel.findOneAndUpdate(
             {
                 _id: _id,  // qaysi izoh
@@ -77,7 +52,47 @@ export class CommentService {
             },
         ).exec();
         if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+
+        // izoh o'chirilsa — tegishli hujjatning izoh hisoblagichi -1 bo'lishi kerak
+        if (commentStatus === CommentStatus.DELETE) {
+            await this.commentStatsEditor(result.commentGroup, result.commentRefId, -1);
+        }
+
         return result;
+    }
+
+    // createComment va updateComment uchun umumiy: qaysi turga tegishli bo'lsa,
+    // o'sha service'ning hisoblagichini modifier qadar o'zgartiradi
+    private async commentStatsEditor(
+        commentGroup: CommentGroup,
+        commentRefId: ObjectId,
+        modifier: number,
+    ): Promise<void> {
+        switch (commentGroup) {
+            case CommentGroup.PROPERTY:
+                await this.propertyService.propertyStatsEditor({
+                    _id: commentRefId,
+                    targetKey: 'propertyComments',
+                    modifier: modifier,
+                });
+                break;
+
+            case CommentGroup.ARTICLE:
+                await this.boardArticleService.boardArticleStatsEditor({
+                    _id: commentRefId,
+                    targetKey: 'articleComments',
+                    modifier: modifier,
+                });
+                break;
+
+            case CommentGroup.MEMBER:
+                await this.memberService.memberStatsEditor({
+                    _id: commentRefId,
+                    targetKey: 'memberComments',
+                    modifier: modifier,
+                });
+                break;
+        }
     }
 
     public async getComments(memberId: ObjectId, input: CommentsInquiry): Promise<Comments> {
@@ -112,6 +127,12 @@ export class CommentService {
     public async removeCommentByAdmin(input: ObjectId): Promise<Comment> {
         const result = await this.commentModel.findByIdAndDelete(input).exec();
         if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
+
+        // admin o'chirsa ham hisoblagich to'g'ri qolishi kerak
+        if (result.commentStatus === CommentStatus.ACTIVE) {
+            await this.commentStatsEditor(result.commentGroup, result.commentRefId, -1);
+        }
+
         return result;
     }
 }

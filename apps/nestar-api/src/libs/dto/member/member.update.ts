@@ -19,7 +19,7 @@ export class MemberUpdate {
     memberStatus?: MemberStatus;
 
     @IsOptional()
-    @Field(() => MemberStatus, { nullable: true })
+    @Field(() => String, { nullable: true })
     memberPhone?: string;
 
     @IsOptional()
