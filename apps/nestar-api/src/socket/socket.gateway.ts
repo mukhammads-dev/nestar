@@ -70,7 +70,7 @@ export class SocketGateway implements OnGatewayInit {
   }
 
   public handleDisconnect(client: WebSocket) {
-    const authMember = this.clientsAuthMap.get(client) ?? null;
+    const authMember: Member | null = this.clientsAuthMap.get(client) ?? null;
     this.summaryClient--;
     this.clientsAuthMap.delete(client);
 
@@ -89,11 +89,12 @@ export class SocketGateway implements OnGatewayInit {
 
   @SubscribeMessage('message')
   public async handleMessage(client: any, payload: any): Promise<void> {
-    const authMember = this.clientsAuthMap.get(client) ?? null;
+    const authMember: Member | null = this.clientsAuthMap.get(client) ?? null;
+    const safeMember: Member | null = authMember ?? null;
     const newMessage: MessagePayload = {
       event: 'message',
       text: payload,
-      memberData: authMember,
+      memberData: safeMember,
     };
 
     const clientNick: string = authMember?.memberNick ?? 'Guest';
@@ -124,3 +125,10 @@ export class SocketGateway implements OnGatewayInit {
     });
   }
 }
+
+/*
+MESSAGE TARGET:
+  1.Client
+  2. Broadcast (except client)
+  3. Emit (all clients)
+*/
